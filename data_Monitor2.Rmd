@@ -1,0 +1,490 @@
+---
+title: "2020 Swisse BHT-Main Sample"
+output: html_document
+author: Qiuyun Lin
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+setwd("C:/Users/LinQi/Desktop/Swisse/Data Monitoring")
+library(readxl)
+library(dplyr)
+library(data.table)
+library(knitr)
+
+DATA<-read_xlsx(path = "77410286 data 1102.xlsx")
+
+options(digits = 4)
+data<-DATA %>%
+  filter(r00 %in% c(2,3) & r01 !=3 ) 
+data$O_F<-ifelse(data$s8 %in% c(11:19),1,2)
+data$age[data$age %in% c(5,6,7)]<-5
+```
+
+```{r base, include=FALSE}
+T<-dim(data)[1]
+ba<-as.matrix(table(data$s1))[1:2]
+bb<-as.matrix(table(data$age))[1:4]
+bc<-as.matrix(table(data$citytier))[1:3]
+bd<-as.matrix(table(data$O_F))[1:2]
+Total<-c(T,ba, bb, bc,bd)
+```
+
+```{r function, include=FALSE}
+SA<-function(x){
+  Total<-as.data.frame(prop.table(table(x)))
+  Gender<-prop.table(table(x, data$s1), margin = 2)
+  Age<-prop.table(table(x, data$age), margin = 2)
+  City<-prop.table(table(x, data$citytier), margin = 2)
+  Online_F<-prop.table(table(x, data$O_F), margin = 2)
+  output1<-as.data.frame(cbind(Gender, Age, City, Online_F))
+  output<-cbind(Total,output1)
+  colnames(output)<-c("Var","Total","Male", "Female", "20-29yo", "30-39yo","40-49yo","50-65yo","T1","T2","T3", "Offline", "Online")
+  output<-output*100
+  print(output)
+}
+
+
+MA<-function(start,end,row,Base){
+  setDT(data)
+  base<-Base
+  total<-as.data.frame(apply(data[,start:end], 2, sum, na.rm = T))
+  
+  gender<-matrix(nrow = row, ncol = 2)
+  for(i in 1:2) {
+    gender[,i]<-apply(data[s1==i,][,start:end], 2, sum, na.rm = T)}
+  
+  age<-matrix(nrow = row, ncol = 4)
+  a<-c(2:5)
+  for(i in 1:4) {
+    age[,i]<-apply(data[age==a[i],][,start:end], 2, sum, na.rm = T)}
+  
+  city<-matrix(nrow = row, ncol = 3)
+  for(i in 1:3) {
+    city[,i]<-apply(data[citytier==i,][,start:end], 2, sum, na.rm = T)}
+  
+  online_f<-matrix(nrow = row, ncol = 2)
+  for(i in 1:2) {
+    online_f[,i]<-apply(data[O_F==i,][,start:end], 2, sum, na.rm = T)}
+  
+  output<-cbind(total, gender, age, city, online_f)
+  output<-rbind(base, output)
+  colnames(output)<-c("Total","Male", "Female", "20-29yo", "30-39yo","40-49yo","50-65yo","T1","T2","T3", "Offline", "Online")
+  percent<-apply(output, 2, function(x) x[-1] / x[1])
+  percent<-percent*100
+  print(percent)
+}
+```
+
+##  Main purchase channel
+```{r, include=FALSE}
+A<-SA(x=data$s8)
+Var<-as.character(c(11,12,13,14,15,16,17,18,19,31,32,33,34,35))
+var_name<-c('药店',	'超市',	'百货公司/百货商场的专柜',	'品牌专卖店（线下实体店）',	'个人护理用品店',	'品牌的直销员',	'自己或亲友从香港/海外购买带回',	'母婴店/婴幼儿用品店',	'美妆店',	'品牌官网/微信官方公众号',	'网上的官方旗舰店',	'网上的跨境购',	'淘宝小店代购',	'微信朋友圈/微商')
+Var_N<-data.table(Var, var_name)
+A$Var<-rownames(A)
+A<-left_join(Var_N, A, by = "Var")
+```
+```{r, echo=FALSE}
+kable(A, row.names = F)
+```
+
+
+## Frequency
+```{r, include=FALSE}
+A<-SA(x= data$a5x1)
+A$Var<-c("每天都吃", "每周大约吃5~6天", "每周大约吃3~4天", "每周大约吃1~2天")
+```
+```{r, echo=FALSE}
+kable(A)
+```
+
+## Start Time
+```{r, include=FALSE}
+A<-SA(x= data$a5x2)
+
+P6M<-apply(A[1:2,], 2, sum)
+P2020<-apply(A[1:3,], 2, sum)
+A<-rbind(A, P6M, P2020)
+A$Var<-c("最近一个月","最近三个月","最近半年", "今年（2020）","去年或之前", "Undup P6M", "Undup今年")
+```
+```{r, echo=FALSE}
+kable(A, row.names = F)
+```
+
+## Bought for others
+```{r, include=FALSE}
+a<-which(variable.names(data) == "a5_1")
+b<-which(variable.names(data) == "a5_4")
+A<-MA(start =a, end = b,row = b-a+1, Base = Total)
+rownames(A)<-c("买给父母长辈", "买给孩子","买给配偶/伴侣/恋人", "买给同事/朋友等")
+```
+```{r, echo=FALSE}
+kable(A)
+```
+
+## Category Ever Use
+```{r, include=FALSE}
+a<-which(variable.names(data) == "a1x1_1")
+b<-which(variable.names(data) == "a1x2_43")
+A<-MA(start =a, end = b,row = b-a+1,Base = Total)
+rownames(A)<-c('复合维生素/多维（包含多种维生素）',	'维生素B',	'维生素C',	'维生素D',	'维生素E',	'钙',	'铁',	'锌',	'叶酸',	'蛋白粉',	'胶原蛋白',	'葡萄籽',	'美白丸/液',	'抗糖化丸/液',	'蔓越莓',	'月见草',	'圣洁莓',	'大豆异黄酮',	'左旋肉碱',	'叶绿素/大麦若叶',	'酵素','其他',	'护肝片（蓟/奶蓟草）',	'鱼油',	'卵磷脂',	'DHA',	'辅酶Q10',	'牛初乳',	'蜂皇浆',	'蜂胶',	'玛咖',	'人参/西洋参',	'益生菌',	'膳食纤维/果蔬纤维',	'氨基葡萄糖',	'软骨素',	'关节灵',	'芹菜籽',	'褪黑素',	'睡眠片',	'血糖宁/血糖片',	'叶黄素',	'蓝莓')
+```
+```{r, echo=FALSE}
+kable(A)
+```
+
+## Category P6M
+```{r, include=FALSE}
+a<-which(variable.names(data) == "a2_1")
+b<-which(variable.names(data) == "a2_43")
+A<-MA(start =a, end = b,row = b-a+1,Base = Total)
+rownames(A)<-c('复合维生素/多维（包含多种维生素）',	'维生素B',	'维生素C',	'维生素D',	'维生素E',	'钙',	'铁',	'锌',	'叶酸',	'蛋白粉',	'胶原蛋白',	'葡萄籽',	'美白丸/液',	'抗糖化丸/液',	'蔓越莓',	'月见草',	'圣洁莓',	'大豆异黄酮',	'左旋肉碱',	'叶绿素/大麦若叶',	'酵素', '护肝片（蓟/奶蓟草）',	'鱼油',	'卵磷脂',	'DHA',	'辅酶Q10',	'牛初乳',	'蜂皇浆',	'蜂胶',	'玛咖',	'人参/西洋参',	'益生菌',	'膳食纤维/果蔬纤维',	'氨基葡萄糖',	'软骨素',	'关节灵',	'芹菜籽',	'褪黑素',	'睡眠片',	'血糖宁/血糖片',	'叶黄素',	'蓝莓')
+```
+```{r, echo=FALSE}
+kable(A)
+```
+
+## Category P1M
+```{r, include=FALSE}
+a<-which(variable.names(data) == "a3_1")
+b<-which(variable.names(data) == "a3_43")
+A<-MA(start =a, end = b,row = b-a+1,Base = Total)
+rownames(A)<-c('复合维生素/多维（包含多种维生素）',	'维生素B',	'维生素C',	'维生素D',	'维生素E',	'钙',	'铁',	'锌',	'叶酸',	'蛋白粉',	'胶原蛋白',	'葡萄籽',	'美白丸/液',	'抗糖化丸/液',	'蔓越莓',	'月见草',	'圣洁莓',	'大豆异黄酮',	'左旋肉碱',	'叶绿素/大麦若叶',	'酵素',	'护肝片（蓟/奶蓟草）',	'鱼油',	'卵磷脂',	'DHA',	'辅酶Q10',	'牛初乳',	'蜂皇浆',	'蜂胶',	'玛咖',	'人参/西洋参',	'益生菌',	'膳食纤维/果蔬纤维',	'氨基葡萄糖',	'软骨素',	'关节灵',	'芹菜籽',	'褪黑素',	'睡眠片',	'血糖宁/血糖片',	'叶黄素',	'蓝莓')
+```
+```{r, echo=FALSE}
+kable(A)
+```
+
+## Brand Pyramid
+```{r loop for grid, echo=FALSE}
+setDF(data)
+data2<-data
+Brandc<-data.table()
+for (i in 1:23){
+  tt<-data2[, c(paste0(c("b2_", "b3x0_", "b3x1_", "b3x2_"),i))]
+  sbrand<-as.data.frame(apply(tt, 2, sum, na.rm = T))
+  rownames(sbrand)<-c("ABA", "EVER", "P6M", "P1M")
+  Brandc<-cbind(Brandc, sbrand)
+}
+
+colnames(Brandc)<- c('Amway',	'汤臣倍健',	'无限极',	'善存',	'钙尔奇',	'Herbalife',	'盖中盖',	'修正',	'养生堂',	'Swisse',	'Blackmores',	'GNC',	'Natures Bounty',	'Healthy Care',	'Life Space',	'Move Free',	'Bioisland',	'Childlife',	'Culturelle',	'合生元',	'Hech',	'Pola',	'Doppelherz')
+Brandp<-Brandc/dim(data)[1]
+Brandp<-Brandp*100
+Brandp$var<-c("ABA", "EVER", "P6M", "P1M")
+Brandp<-cbind(Brandp[,24],Brandp[,-24])
+kable(Brandp)
+```
+
+## Brand ABA
+```{r, include=FALSE}
+a<-which(variable.names(data) == "b2_1")
+b<-which(variable.names(data) == "b2_23")
+A<-MA(start =a, end = b,row = b-a+1,Base = Total)
+rownames(A)<-c('Amway',	'汤臣倍健',	'无限极',	'善存',	'钙尔奇',	'Herbalife',	'盖中盖',	'修正',	'养生堂',	'Swisse',	'Blackmores',	'GNC',	'Natures Bounty',	'Healthy Care',	'Life Space',	'Move Free',	'Bioisland',	'Childlife',	'Culturelle',	'合生元',	'Hech',	'Pola',	'Doppelherz')
+```
+```{r,echo=FALSE}
+kable(A)
+```
+
+## Ever Used
+```{r, include=FALSE}
+a<-which(variable.names(data) == "b3x0_1")
+b<-which(variable.names(data) == "b3x0_23")
+A<-MA(start =a, end = b,row = b-a+1,Base = Total)
+rownames(A)<-c('Amway',	'汤臣倍健',	'无限极',	'善存',	'钙尔奇',	'Herbalife',	'盖中盖',	'修正',	'养生堂',	'Swisse',	'Blackmores',	'GNC',	'Natures Bounty',	'Healthy Care',	'Life Space',	'Move Free',	'Bioisland',	'Childlife',	'Culturelle',	'合生元',	'Hech',	'Pola',	'Doppelherz')
+```
+```{r, echo=FALSE}
+kable(A)
+```
+
+## First Brand
+```{r, include=FALSE}
+A<-SA(x= data$b3x4)
+
+Var<-as.character(c(1:23))
+var_name<-c('Amway',	'汤臣倍健',	'无限极',	'善存',	'钙尔奇',	'Herbalife',	'盖中盖',	'修正',	'养生堂',	'Swisse',	'Blackmores',	'GNC',	'Natures Bounty',	'Healthy Care',	'Life Space',	'Move Free',	'Bioisland',	'Childlife',	'Culturelle',	'合生元',	'Hech',	'Pola',	'Doppelherz')
+Var_N<-data.table(Var, var_name)
+A$Var<-rownames(A)
+A<-left_join(Var_N, A, by = "Var")
+```
+
+```{r, echo=FALSE}
+kable(A, row.names = F)
+```
+
+## Brand P6M
+```{r, include=FALSE}
+a<-which(variable.names(data) == "b3x1_1")
+b<-which(variable.names(data) == "b3x1_23")
+A<-MA(start =a, end = b,row = b-a+1,Base = Total)
+rownames(A)<-c('Amway',	'汤臣倍健',	'无限极',	'善存',	'钙尔奇',	'Herbalife',	'盖中盖',	'修正',	'养生堂',	'Swisse',	'Blackmores',	'GNC',	'Natures Bounty',	'Healthy Care',	'Life Space',	'Move Free',	'Bioisland',	'Childlife',	'Culturelle',	'合生元',	'Hech',	'Pola',	'Doppelherz')
+```
+```{r, echo=FALSE}
+kable(A)
+```
+
+## Brand P1M
+```{r, include=FALSE}
+a<-which(variable.names(data) == "b3x2_1")
+b<-which(variable.names(data) == "b3x2_23")
+A<-MA(start =a, end = b,row = b-a+1,Base = Total)
+rownames(A)<-c('Amway',	'汤臣倍健',	'无限极',	'善存',	'钙尔奇',	'Herbalife',	'盖中盖',	'修正',	'养生堂',	'Swisse',	'Blackmores',	'GNC',	'Natures Bounty',	'Healthy Care',	'Life Space',	'Move Free',	'Bioisland',	'Childlife',	'Culturelle',	'合生元',	'Hech',	'Pola',	'Doppelherz')
+```
+```{r, echo=FALSE}
+kable(A)
+```
+
+## Purchase Intent
+```{r, echo=FALSE}
+fun3<-function(x){
+  as.data.frame(prop.table(table(x)))
+}
+
+a<-which(variable.names(data) == "b3x3_1")
+b<-which(variable.names(data) == "b3x3_23")
+
+setDF(data)
+data3<-data[,c(a:b)]
+PI<-data.table(var=c(1:4))
+PI$var<-as.factor(PI$var)
+
+for (i in 1:23){
+  PI1<-as.data.table(apply(data3[i],2,fun3))
+  colnames(PI1)<-c("var", variable.names(data3)[i])
+  PI<-left_join(PI, PI1, by="var")
+}
+
+PI<-as.data.frame(PI)
+PI<-PI*100
+PI$var<-c("第一","认真","可能", "不会")
+colnames(PI)<-c('var','Amway',	'汤臣倍健',	'无限极',	'善存',	'钙尔奇',	'Herbalife',	'盖中盖',	'修正',	'养生堂',	'Swisse',	'Blackmores',	'GNC',	'Natures Bounty',	'Healthy Care',	'Life Space',	'Move Free',	'Bioisland',	'Childlife',	'Culturelle',	'合生元',	'Hech',	'Pola',	'Doppelherz')
+
+kable(PI)
+```
+
+
+```{r function for mdf, include=F}
+Brand_base<-Brandc[1, c('Amway',	'汤臣倍健', '善存',	'钙尔奇',	'养生堂',	'Swisse',	'Blackmores',	'GNC',	'Life Space',	'Move Free',	'Bioisland')]
+Brand_base$Total<-1
+Brand_base<-cbind(Brand_base[,12], Brand_base[,-12])
+fun4<-function(var1, var2, range){
+  a<-which(variable.names(data)==var1)
+  b<-which(variable.names(data)==var2)
+  Count<-data.table(V1 = range)
+  
+  for(i in a:b) {
+    A<-as.data.table(table(data[,i]))[V1 %in% range]
+    colnames(A)<-c("V1", variable.names(data)[i])
+    A$V1<-as.integer(A$V1)
+    Count<-left_join(Count,A, by = "V1")
+    }
+  T3B<-apply(Count, 2,sum, na.rm = T)
+  T2B<-apply(Count[2:3,], 2, sum, na.rm = T)
+  TB<-t(as.matrix(cbind(T2B, T3B)))
+  TB<-rbind(Brand_base,TB,use.names = F)
+  TB_percent<-apply(TB, 2, function(x) x[-1] / x[1])
+  TB_percent<-TB_percent*100
+  Mean<-round(apply(data[,c((a-1):b)], 2, mean, na.rm=T),digits = 4)
+  output<-rbind(TB_percent,Mean)
+  print(output)
+}
+
+```
+
+*LiKability*
+```{r, include=F}
+r<-c(9:11)
+OUTPUT<-as.data.frame(fun4(var1 = "b4_1" , var2 ="b4_17" , range = r))
+OUTPUT$Total<-c("T2B", "T3B", "Mean")
+```
+```{r, echo=F}
+kable(OUTPUT)
+```
+
+##Uniqueness
+```{r, include=F}
+r<-c(8:10)
+OUTPUT<-as.data.frame(fun4(var1 = "b5_1" , var2 ="b5_17" , range = r))
+OUTPUT$Total<-c("T2B", "T3B", "Mean")
+```
+```{r, echo=F}
+kable(OUTPUT)
+```
+
+##Meet Needs
+```{r, include=F}
+r<-c(8:10)
+OUTPUT<-as.data.frame(fun4(var1 = "b6_1" , var2 ="b6_17" , range = r))
+OUTPUT$Total<-c("T2B", "T3B", "Mean")
+```
+```{r, echo=F}
+kable(OUTPUT)
+```
+
+## Set Trend
+```{r, include=F}
+r<-c(8:10)
+OUTPUT<-as.data.frame(fun4(var1 = "b7_1" , var2 ="b7_17" , range = r))
+OUTPUT$Total<-c("T2B", "T3B", "Mean")
+```
+```{r, echo=F}
+kable(OUTPUT)
+```
+
+## Brand Image
+```{r, echo=FALSE}
+list<-c(1,2,4,5,9,10,11,12,15,16,17)
+image_r<-as.numeric(1:18)
+first_letter<-("b8_")
+Brand_i_c<-data.table()
+data_imgae<-setDF(data)
+
+for (i in 1:length(list)){
+  tt<-data_imgae[, c(paste0(first_letter,image_r, "_", list[i]))]
+  sbrand<-as.data.frame(apply(tt, 2, sum, na.rm = T))
+  Brand_i_c<-cbind(Brand_i_c, sbrand)
+}
+
+colnames(Brand_i_c)<-c('Amway',	'汤臣倍健', '善存',	'钙尔奇',	'养生堂',	'Swisse',	'Blackmores',	'GNC',	'Life Space',	'Move Free',	'Bioisland')
+Brand_base<-as.data.frame(Brandc[1, c('Amway',	'汤臣倍健', '善存',	'钙尔奇',	'养生堂',	'Swisse',	'Blackmores',	'GNC',	'Life Space',	'Move Free',	'Bioisland')]) ## update base and label
+Brand_i_c<-rbind(Brand_i_c, Brand_base)
+
+Brand_i_p<-as.data.frame(apply(Brand_i_c, 2, function(x) x[-19] / x[19] * 100)) ## modify the base line: length(image_range)+1
+Brand_i_p$var<-c('专业的',	'值得信赖的',	'安全的',	'天然的/自然的',	'高品质的',	'高端的',	'国际化的',	'引领的',	'历史悠久的',	'令人向往的',	'年轻化的',	'有幸福感的',	'时尚的',	'积极的',	'真实的',	'有颠覆性/开拓性的',	'勇敢',	'自信') ##update label
+Brand_i_p<-cbind(Brand_i_p[,12],Brand_i_p[,-12]) ## modify the base line: length(brand_list)+1
+kable(Brand_i_p)
+```
+
+
+## Brand Image - Product
+```{r, echo=FALSE}
+list<-c(1,2,4,5,9,10,11,12,15,16,17)
+image_r<-c(1,2,3,4,6,7,8,9,10) ##list不连续需要加c
+first_letter<-("b9x1")
+Brand_i_c<-data.table()
+data_imgae<-setDF(data)
+
+for (i in 1:length(list)){
+  tt<-data_imgae[, c(paste0(first_letter,"_",image_r, "_", list[i]))]
+  sbrand<-as.data.frame(apply(tt, 2, sum, na.rm = T))
+  Brand_i_c<-cbind(Brand_i_c, sbrand)
+}
+
+colnames(Brand_i_c)<-c('Amway',	'汤臣倍健', '善存',	'钙尔奇',	'养生堂',	'Swisse',	'Blackmores',	'GNC',	'Life Space',	'Move Free',	'Bioisland')
+Brand_base<-as.data.frame(Brandc[1, c('Amway',	'汤臣倍健', '善存',	'钙尔奇',	'养生堂',	'Swisse',	'Blackmores',	'GNC',	'Life Space',	'Move Free',	'Bioisland')]) ## update base and label
+Brand_i_c<-rbind(Brand_i_c, Brand_base)
+
+Brand_i_p<-as.data.frame(apply(Brand_i_c, 2, function(x) x[-10] / x[10] * 100)) ## modify the base line: length(image_range)+1
+Brand_i_p$var<-c('产品基于科学、临床验证的',	'产品经专业机构认证的',	'具有专利的配方',	'产品销量领先的',	'有创新的产品',	'产品有严格安全的生产标准',	'有功效/见效快的',	'采用全球优质独特的原料，可溯源',	'不添加激素') ##update label
+Brand_i_p<-cbind(Brand_i_p[,12],Brand_i_p[,-12]) ## modify the base line: length(brand_list)+1
+kable(Brand_i_p)
+```
+
+## Brand Image - Brand
+```{r, echo=FALSE}
+list<-c(1,2,4,5,9,10,11,12,15,16,17)
+image_r<-c(1,2,3,4,5,6,7,8,10,11) ##list不连续需要加c
+first_letter<-("b9x2")
+Brand_i_c<-data.table()
+data_imgae<-setDF(data)
+
+for (i in 1:length(list)){
+  tt<-data_imgae[, c(paste0(first_letter,"_",image_r, "_", list[i]))]
+  sbrand<-as.data.frame(apply(tt, 2, sum, na.rm = T))
+  Brand_i_c<-cbind(Brand_i_c, sbrand)
+}
+
+colnames(Brand_i_c)<-c('Amway',	'汤臣倍健', '善存',	'钙尔奇',	'养生堂',	'Swisse',	'Blackmores',	'GNC',	'Life Space',	'Move Free',	'Bioisland')
+Brand_base<-as.data.frame(Brandc[1, c('Amway',	'汤臣倍健', '善存',	'钙尔奇',	'养生堂',	'Swisse',	'Blackmores',	'GNC',	'Life Space',	'Move Free',	'Bioisland')]) ## update base and label
+Brand_i_c<-rbind(Brand_i_c, Brand_base)
+
+Brand_i_p<-as.data.frame(apply(Brand_i_c, 2, function(x) x[-11] / x[11] * 100)) ## modify the base line: length(image_range)+1
+Brand_i_p$var<-c('知名品牌/大品牌',	'在发源地受到认可和信赖',	'进口的',	'来自欧美的',	'来自澳洲的',	'原料产地纯净无污染的',	'倡导健康快乐生活方式的',	'医生/专家推荐的',	'很多明星/名人/KOL推荐的',	'运动员推荐的') ##update label
+Brand_i_p<-cbind(Brand_i_p[,12],Brand_i_p[,-12]) ## modify the base line: length(brand_list)+1
+kable(Brand_i_p)
+```
+
+*Brand Choose Reason-Swisse*
+```{r, include= F}
+Swisse<-data %>%
+  filter(b3x0_10 == 1)
+T<-dim(Swisse)[1]
+ba<-as.matrix(table(Swisse$s1))[1:2]
+bb<-as.matrix(table(Swisse$age))[1:4]
+bc<-as.matrix(table(Swisse$citytier))[1:3]
+Swisse_base<-c(T,ba, bb, bc)
+
+a<-which(variable.names(data) == "D7x2_11_10")
+b<-which(variable.names(data) == "D7x2_54_10")
+A<-MA(start =a, end = b,row = b-a+1,Base = Swisse_base)
+
+rownames(A)<-c('品牌可信赖',	'品牌时尚',	'品牌专业',	'大品牌/知名品牌',	'来自澳洲的品牌',	'天然的/自然的品牌',	'产品见效快',	'产品功效有针对性，适合自己',	'产品有效成分含量高',	'产品包装和规格合适',	'产品有TAG认证',	'产品产地有保障',	'价格合适',	'有促销/推广活动',	'性价比高',	'店内有促销人员积极介绍',	'亲朋好友推荐',	'专家/医生推荐',	'社交媒体博主/网友推荐',	'电商平台/网站买家评价好',	'电商直播种草',	'在店内/货架陈列、展示醒目',	'很容易买到',	'购买时库存充足',	'广告比较多，受到影响')
+```
+
+```{r, echo=FALSE}
+kable(A)
+```
+
+##Brand Choose Reason-Tangchen
+```{r, include= F}
+TC<-data %>%
+  filter(b3x0_2 == 1)
+T<-dim(TC)[1]
+ba<-as.matrix(table(TC$s1))[1:2]
+bb<-as.matrix(table(TC$age))[1:4]
+bc<-as.matrix(table(TC$citytier))[1:3]
+TC_base<-c(T,ba, bb, bc)
+
+a<-which(variable.names(data) == "D7x2_11_2")
+b<-which(variable.names(data) == "D7x2_54_2")
+A<-MA(start =a, end = b,row = b-a+1,Base = TC_base)
+
+rownames(A)<-c('品牌可信赖',	'品牌时尚',	'品牌专业',	'大品牌/知名品牌','来自澳洲的品牌',	'天然的/自然的品牌',	'产品见效快',	'产品功效有针对性，适合自己',	'产品有效成分含量高',	'产品包装和规格合适',	'蓝帽子认证',	'产品产地有保障',	'价格合适',	'有促销/推广活动',	'性价比高',	'店内有促销人员积极介绍',	'亲朋好友推荐',	'专家/医生推荐',	'社交媒体博主/网友推荐',	'电商平台/网站买家评价好',	'电商直播种草',	'在店内/货架陈列、展示醒目',	'很容易买到',	'购买时库存充足',	'广告比较多，受到影响')
+```
+
+```{r, echo=FALSE}
+kable(A)
+```
+
+##Brand Barriers-Swisse
+```{r, include= F}
+Swisse_n<-data %>%
+  filter(b2_10 == 1 & b3x0_10!=1)
+T<-dim(Swisse_n)[1]
+ba<-as.matrix(table(Swisse_n$s1))[1:2]
+bb<-as.matrix(table(Swisse_n$age))[1:4]
+bc<-as.matrix(table(Swisse_n$citytier))[1:3]
+Swisse_n_base<-c(T,ba, bb, bc)
+
+a<-which(variable.names(data) == "D6x1_11_10")
+b<-which(variable.names(data) == "D6x1_72_10")
+A<-MA(start =a, end = b,row = b-a+1,Base = Swisse_n_base)
+
+rownames(A)<-c('对这个品牌不了解',	'单纯不喜欢这个品牌',	'担心效果不好',	'担心有依赖性',	'担心有副作用',	'我使用其他产品效果好',	'其他产品的有效成分含量更高',	'没有我需要的产品',	'价格比我常用的品牌高',	'没有优惠活动',	'性价比低',	'亲朋好友没有推荐过',	'专家/医生没有推荐过',	'没看到网上的达人/博主推荐',	'别人用过都说不好',	'身边没有人在食用',	'网上的评价一般',	'有负面新闻',	'平时购买保健品的渠道买不到',	'药店/商超等实体店中没有见到这个品牌',	'不喜欢海淘/代购产品',	'单纯不想尝试新的品牌')
+```
+
+```{r,echo=FALSE}
+kable(A)
+```
+
+*Brand Barriers-Tangchen*
+```{r, include= F}
+TC_n<-data %>%
+  filter(b2_2 == 1 & b3x0_2!=1)
+T<-dim(TC_n)[1]
+ba<-as.matrix(table(TC_n$s1))[1:2]
+bb<-as.matrix(table(TC_n$age))[1:4]
+bc<-as.matrix(table(TC_n$citytier))[1:3]
+TC_n_base<-c(T,ba, bb, bc)
+
+a<-which(variable.names(data) == "D6x1_11_2")
+b<-which(variable.names(data) == "D6x1_72_2")
+A<-MA(start =a, end = b,row = b-a+1,Base = TC_n_base)
+
+rownames(A)<-c('对这个品牌不了解',	'单纯不喜欢这个品牌',	'担心效果不好',	'担心有依赖性',	'担心有副作用',	'我使用其他产品效果好',	'其他产品的有效成分含量更高',	'没有我需要的产品',	'价格比我常用的品牌高',	'没有优惠活动',	'性价比低',	'亲朋好友没有推荐过',	'专家/医生没有推荐过',	'没看到网上的达人/博主推荐',	'别人用过都说不好',	'身边没有人在食用',	'网上的评价一般',	'有负面新闻',	'平时购买保健品的渠道买不到',	'药店/商超等实体店中没有见到这个品牌',	'不喜欢海淘/代购产品',	'单纯不想尝试新的品牌')
+```
+
+```{r, echo=FALSE}
+kable(A)
